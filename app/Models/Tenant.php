@@ -38,18 +38,18 @@ class Tenant extends StanclTenant implements TenantWithDatabase
     protected static function booted(): void
     {
         static::deleting(function ($tenant) {
-            // Só executar remoção do DB quando for uma exclusão permanente (forceDelete)
-            // Quando soft-deleting, isForceDeleting() retorna false.
+            // Only remove the database when this is a permanent deletion (forceDelete)
+            // When soft-deleting, isForceDeleting() returns false.
             if (method_exists($tenant, 'isForceDeleting') && $tenant->isForceDeleting()) {
                 try {
-                    // Garante que db_name/credentials estejam presentes
+                    // Ensure that db_name/credentials are present
                     $tenant->database()->makeCredentials();
 
-                    // Deleção via manager do stancl (usa template connection configurada)
+                    // Deletion via Stancl's manager (uses configured template connection)
                     $tenant->database()->manager()->deleteDatabase($tenant);
                 } catch (\Throwable $e) {
-                    // Não pare a remoção do model se o DB não for removido; apenas logue.
-                    Log::error(sprintf('Erro ao remover DB do tenant %s: %s', $tenant->getTenantKey(), $e->getMessage()));
+                    // Do not stop model deletion if the DB is not removed; just log the error.
+                    Log::error(sprintf('Error removing tenant DB %s: %s', $tenant->getTenantKey(), $e->getMessage()));
                 }
             }
         });
