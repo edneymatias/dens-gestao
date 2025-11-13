@@ -11,7 +11,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Register InitializeLocale middleware for web and api groups
+        // This runs after tenancy and session initialization
+        $middleware->web(append: [
+            \App\Http\Middleware\InitializeLocale::class,
+        ]);
+
+        $middleware->api(append: [
+            \App\Http\Middleware\InitializeLocale::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

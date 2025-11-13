@@ -86,6 +86,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Supported Application Locales
+    |--------------------------------------------------------------------------
+    |
+    | These are the locales that the application supports for localization.
+    | The locale resolution middleware will only accept these locales.
+    | The fallback is en_US.
+    |
+    */
+
+    'supported_locales' => ['en_US', 'pt_BR', 'es_ES'],
+
+    /*
+    |--------------------------------------------------------------------------
     | Encryption Key
     |--------------------------------------------------------------------------
     |

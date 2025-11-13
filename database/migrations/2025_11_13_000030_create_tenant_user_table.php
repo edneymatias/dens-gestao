@@ -17,6 +17,7 @@ return new class extends Migration
 
             $table->string('role')->default('member');
             $table->boolean('is_owner')->default(false);
+            $table->string('locale', 10)->nullable();
 
             $table->timestamps();
 
