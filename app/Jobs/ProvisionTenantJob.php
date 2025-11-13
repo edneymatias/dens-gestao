@@ -2,8 +2,8 @@
 
 namespace App\Jobs;
 
-use App\Services\TenantProvisionService;
 use App\Models\Tenant;
+use App\Services\TenantProvisionService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -22,11 +22,13 @@ class ProvisionTenantJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $payload;
+
     public bool $migrate;
+
     public bool $seed;
 
     /**
-     * @param mixed $payload Array with tenant data (name/id) or ['tenant_id' => '...']
+     * @param  mixed  $payload  Array with tenant data (name/id) or ['tenant_id' => '...']
      */
     public function __construct($payload, bool $migrate = true, bool $seed = false)
     {
@@ -42,12 +44,14 @@ class ProvisionTenantJob implements ShouldQueue
                 $tenant = Tenant::find($this->payload['tenant_id']);
 
                 if (! $tenant) {
-                    Log::warning('ProvisionTenantJob: tenant not found: ' . $this->payload['tenant_id']);
+                    Log::warning('ProvisionTenantJob: tenant not found: '.$this->payload['tenant_id']);
+
                     return;
                 }
 
                 // Use completeProvision to finish provisioning for an existing tenant.
                 $service->completeProvision($tenant, $this->migrate, $this->seed);
+
                 return;
             }
 
@@ -55,7 +59,7 @@ class ProvisionTenantJob implements ShouldQueue
             $data = is_array($this->payload) ? $this->payload : [];
             $service->provision($data, $this->migrate, $this->seed);
         } catch (Throwable $e) {
-            Log::error('Asynchronous tenant provisioning failed: ' . $e->getMessage());
+            Log::error('Asynchronous tenant provisioning failed: '.$e->getMessage());
             throw $e;
         }
     }

@@ -3,9 +3,9 @@
 namespace App\Models;
 
 use App\Concerns\HasAppDefaults;
-use Stancl\Tenancy\Database\Models\Tenant as StanclTenant;
-use Stancl\Tenancy\Contracts\TenantWithDatabase;
 use Illuminate\Support\Facades\Log;
+use Stancl\Tenancy\Contracts\TenantWithDatabase;
+use Stancl\Tenancy\Database\Models\Tenant as StanclTenant;
 use Stancl\Tenancy\DatabaseConfig;
 
 class Tenant extends StanclTenant implements TenantWithDatabase

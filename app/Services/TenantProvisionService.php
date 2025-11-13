@@ -5,8 +5,8 @@ namespace App\Services;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
-use InvalidArgumentException;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use RuntimeException;
 use Throwable;
 
@@ -21,11 +21,7 @@ class TenantProvisionService
     /**
      * Provision a tenant.
      *
-     * @param array $data ['name' => string, 'id' => ?string]
-     * @param bool $migrate
-     * @param bool $seed
-     *
-     * @return Tenant
+     * @param  array  $data  ['name' => string, 'id' => ?string]
      *
      * @throws Throwable
      */
@@ -50,7 +46,7 @@ class TenantProvisionService
         }
 
         // Compute a safe db_name using the tenancy prefix/suffix and the tenant id.
-        $dbName = config('tenancy.database.prefix') . $id . config('tenancy.database.suffix');
+        $dbName = config('tenancy.database.prefix').$id.config('tenancy.database.suffix');
 
         $connection = Tenant::query()->getModel()->getConnection();
 
@@ -67,7 +63,7 @@ class TenantProvisionService
                 $tenant->database()->makeCredentials();
             });
         } catch (Throwable $e) {
-            Log::error('Tenant provisioning failed during creation transaction: ' . $e->getMessage());
+            Log::error('Tenant provisioning failed during creation transaction: '.$e->getMessage());
 
             // Nothing external (DB server) created yet in this stage, so just rethrow.
             throw $e;
@@ -83,14 +79,14 @@ class TenantProvisionService
             $tenant->provision_state = 'provisioning';
             $tenant->save();
         } catch (Throwable $e) {
-            Log::warning('Failed to set provision_state=provisioning: ' . $e->getMessage());
+            Log::warning('Failed to set provision_state=provisioning: '.$e->getMessage());
         }
 
         // Now create the physical database via the manager (outside the transaction).
         try {
             $tenant->database()->manager()->createDatabase($tenant);
         } catch (Throwable $e) {
-            Log::error('Tenant provisioning failed creating physical database: ' . $e->getMessage());
+            Log::error('Tenant provisioning failed creating physical database: '.$e->getMessage());
 
             // Attempt cleanup: remove tenant record if DB creation failed.
             try {
@@ -98,7 +94,7 @@ class TenantProvisionService
                     $tenant->forceDelete();
                 }
             } catch (Throwable $cleanupEx) {
-                Log::error('Cleanup after failed physical DB creation also failed: ' . $cleanupEx->getMessage());
+                Log::error('Cleanup after failed physical DB creation also failed: '.$cleanupEx->getMessage());
             }
 
             throw $e;
@@ -117,7 +113,7 @@ class TenantProvisionService
                 ]);
             }
         } catch (Throwable $e) {
-            Log::error('Tenant provisioning failed during migrate/seed: ' . $e->getMessage());
+            Log::error('Tenant provisioning failed during migrate/seed: '.$e->getMessage());
 
             // Attempt cleanup: delete DB and tenant record and mark failed.
             try {
@@ -128,7 +124,7 @@ class TenantProvisionService
                     $tenant->forceDelete();
                 }
             } catch (Throwable $cleanupEx) {
-                Log::error('Cleanup after failed migrate/seed also failed: ' . $cleanupEx->getMessage());
+                Log::error('Cleanup after failed migrate/seed also failed: '.$cleanupEx->getMessage());
             }
 
             throw $e;
@@ -139,7 +135,7 @@ class TenantProvisionService
             $tenant->provision_state = 'provisioned';
             $tenant->save();
         } catch (Throwable $e) {
-            Log::warning('Failed to set provision_state=provisioned: ' . $e->getMessage());
+            Log::warning('Failed to set provision_state=provisioned: '.$e->getMessage());
         }
 
         return $tenant;
@@ -149,11 +145,7 @@ class TenantProvisionService
      * Complete provisioning for an existing tenant record.
      * This is used by the reconciler to retry tenants stuck in 'provisioning'.
      *
-     * @param Tenant $tenant
-     * @param bool $migrate
-     * @param bool $seed
      *
-     * @return Tenant
      *
      * @throws Throwable
      */
@@ -167,7 +159,7 @@ class TenantProvisionService
             $tenant->provision_state = 'provisioning';
             $tenant->save();
         } catch (Throwable $e) {
-            Log::warning('Failed to set provision_state=provisioning on completeProvision: ' . $e->getMessage());
+            Log::warning('Failed to set provision_state=provisioning on completeProvision: '.$e->getMessage());
         }
 
         $manager = $tenant->database()->manager();
@@ -178,7 +170,7 @@ class TenantProvisionService
                 $manager->createDatabase($tenant);
             }
         } catch (Throwable $e) {
-            Log::error('Reconciler failed to create physical database: ' . $e->getMessage());
+            Log::error('Reconciler failed to create physical database: '.$e->getMessage());
             $tenant->provision_state = 'failed';
             $tenant->save();
             throw $e;
@@ -193,7 +185,7 @@ class TenantProvisionService
                 Artisan::call('tenants:seed', ['--tenants' => [$tenant->getTenantKey()]]);
             }
         } catch (Throwable $e) {
-            Log::error('Reconciler failed during migrate/seed: ' . $e->getMessage());
+            Log::error('Reconciler failed during migrate/seed: '.$e->getMessage());
             $tenant->provision_state = 'failed';
             $tenant->save();
 
@@ -204,7 +196,7 @@ class TenantProvisionService
             $tenant->provision_state = 'provisioned';
             $tenant->save();
         } catch (Throwable $e) {
-            Log::warning('Failed to set provision_state=provisioned in completeProvision: ' . $e->getMessage());
+            Log::warning('Failed to set provision_state=provisioned in completeProvision: '.$e->getMessage());
         }
 
         return $tenant;

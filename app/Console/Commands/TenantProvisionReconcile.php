@@ -4,9 +4,9 @@ namespace App\Console\Commands;
 
 use App\Models\Tenant;
 use App\Services\TenantProvisionService;
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
-use Carbon\Carbon;
 
 class TenantProvisionReconcile extends Command
 {
@@ -48,19 +48,20 @@ class TenantProvisionReconcile extends Command
 
         if ($tenants->isEmpty()) {
             $this->info('No stuck tenants found.');
+
             return 0;
         }
 
         foreach ($tenants as $tenant) {
-            $this->line('Reconciling tenant: ' . $tenant->getTenantKey());
+            $this->line('Reconciling tenant: '.$tenant->getTenantKey());
 
             try {
                 // Dispatch an asynchronous job to avoid long-running scheduler tasks.
                 \App\Jobs\ProvisionTenantJob::dispatch(['tenant_id' => $tenant->getTenantKey()], true, false);
-                $this->info('Dispatched ProvisionTenantJob for: ' . $tenant->getTenantKey());
+                $this->info('Dispatched ProvisionTenantJob for: '.$tenant->getTenantKey());
             } catch (\Throwable $e) {
-                Log::error('Failed to dispatch ProvisionTenantJob for ' . $tenant->getTenantKey() . ': ' . $e->getMessage());
-                $this->error('Failed to dispatch ProvisionTenantJob for ' . $tenant->getTenantKey() . ': ' . $e->getMessage());
+                Log::error('Failed to dispatch ProvisionTenantJob for '.$tenant->getTenantKey().': '.$e->getMessage());
+                $this->error('Failed to dispatch ProvisionTenantJob for '.$tenant->getTenantKey().': '.$e->getMessage());
             }
         }
 

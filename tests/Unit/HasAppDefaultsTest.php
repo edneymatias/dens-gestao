@@ -2,14 +2,14 @@
 
 namespace Tests\Unit;
 
-use Tests\TestCase;
 use App\Models\User;
+use Tests\TestCase;
 
 class HasAppDefaultsTest extends TestCase
 {
     public function test_key_type_and_incrementing(): void
     {
-        $user = new User();
+        $user = new User;
 
         $this->assertSame('string', $user->getKeyType());
         $this->assertFalse($user->isIncrementing());

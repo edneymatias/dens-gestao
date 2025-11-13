@@ -9,7 +9,7 @@ use Tests\TestCase;
 
 class TenantProvisionServiceSeedTest extends TestCase
 {
-    public function tearDown(): void
+    protected function tearDown(): void
     {
         Mockery::close();
 

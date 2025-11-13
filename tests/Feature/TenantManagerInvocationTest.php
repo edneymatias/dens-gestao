@@ -2,10 +2,10 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Stancl\Tenancy\TenantDatabaseManagers\SQLiteDatabaseManager;
+use Tests\TestCase;
 
 class TenantManagerInvocationTest extends TestCase
 {
@@ -13,7 +13,7 @@ class TenantManagerInvocationTest extends TestCase
     {
         // Prepare a tenant record in the central DB
         $tenantId = (string) Str::ulid();
-        $dbName = 'tenant_test_' . substr(md5((string) Str::ulid()), 0, 8);
+        $dbName = 'tenant_test_'.substr(md5((string) Str::ulid()), 0, 8);
 
         DB::table('tenants')->insert([
             'id' => $tenantId,
@@ -25,12 +25,12 @@ class TenantManagerInvocationTest extends TestCase
             'updated_at' => now(),
         ]);
 
-    $tenant = \App\Models\Tenant::find($tenantId);
-    $this->assertNotNull($tenant);
+        $tenant = \App\Models\Tenant::find($tenantId);
+        $this->assertNotNull($tenant);
 
-    // Ensure the internal db_name is set so DatabaseConfig::getName() returns the expected name
-    $tenant->setInternal('db_name', $dbName);
-    $tenant->save();
+        // Ensure the internal db_name is set so DatabaseConfig::getName() returns the expected name
+        $tenant->setInternal('db_name', $dbName);
+        $tenant->save();
 
         // Create a physical sqlite database file for this tenant so the real SQLiteDatabaseManager
         // will attempt to delete it when the tenant is force deleted.
@@ -39,11 +39,11 @@ class TenantManagerInvocationTest extends TestCase
             file_put_contents($dbPath, '');
         }
 
-    // Sanity: ensure the DatabaseConfig reports the same name we expect
-    $tenantReloaded = \App\Models\Tenant::find($tenantId);
-    $this->assertSame($dbName, $tenantReloaded->database()->getName());
+        // Sanity: ensure the DatabaseConfig reports the same name we expect
+        $tenantReloaded = \App\Models\Tenant::find($tenantId);
+        $this->assertSame($dbName, $tenantReloaded->database()->getName());
 
-    $this->assertFileExists($dbPath, 'Expected tenant database file to exist before forceDelete');
+        $this->assertFileExists($dbPath, 'Expected tenant database file to exist before forceDelete');
 
         // Force delete the tenant - the real manager should remove the DB file
         \App\Models\Tenant::withTrashed()->find($tenant->id)->forceDelete();

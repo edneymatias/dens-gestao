@@ -10,13 +10,11 @@ class CreateTenantsTable extends Migration
 {
     /**
      * Run the migrations.
-     *
-     * @return void
      */
     public function up(): void
     {
         Schema::create('tenants', function (Blueprint $table) {
-            //$table->string('id')->primary();
+            // $table->string('id')->primary();
             $table->ulid('id')->primary();
             $table->string('name')->nullable()->index();
             $table->string('db_name')->nullable()->unique();
@@ -33,8 +31,6 @@ class CreateTenantsTable extends Migration
 
     /**
      * Reverse the migrations.
-     *
-     * @return void
      */
     public function down(): void
     {

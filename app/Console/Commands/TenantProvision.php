@@ -45,17 +45,19 @@ class TenantProvision extends Command
             if ($async) {
                 ProvisionTenantJob::dispatch(['name' => $name, 'id' => $id], true, $seed);
                 $this->info('Provision job dispatched (async).');
+
                 return 0;
             }
 
             $tenant = $this->service->provision(['name' => $name, 'id' => $id], true, $seed);
 
-            $this->info('Tenant provisioned: ' . $tenant->getTenantKey());
-            $this->info('DB name: ' . $tenant->database()->getName());
+            $this->info('Tenant provisioned: '.$tenant->getTenantKey());
+            $this->info('DB name: '.$tenant->database()->getName());
 
             return 0;
         } catch (Exception $e) {
-            $this->error('Provision failed: ' . $e->getMessage());
+            $this->error('Provision failed: '.$e->getMessage());
+
             return 1;
         }
     }
