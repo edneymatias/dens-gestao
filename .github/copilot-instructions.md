@@ -199,4 +199,12 @@ protected function isAccessible(User $user, ?string $path = null): bool
 - To run all tests: `php artisan test`.
 - To run all tests in a file: `php artisan test tests/Feature/ExampleTest.php`.
 - To filter on a particular test name: `php artisan test --filter=testName` (recommended after making a change to a related file).
+
+
+=== tests rules ===
+
+## Test Enforcement
+
+- Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests to make sure they pass.
+- Run the minimum number of tests needed to ensure code quality and speed. Use `php artisan test` with a specific filename or filter.
 </laravel-boost-guidelines>

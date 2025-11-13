@@ -4,9 +4,7 @@ namespace Tests\Feature;
 
 use Tests\TestCase;
 use App\Models\User;
-use App\Models\Tenant;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 
 class SoftDeletesTest extends TestCase
@@ -14,12 +12,6 @@ class SoftDeletesTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-
-        // Ensure migrations run for the test environment.
-        // Run migrations for the default connection and explicitly for the 'central' connection
-        // because some models (User) use the 'central' connection.
-        Artisan::call('migrate:fresh');
-        Artisan::call('migrate:fresh', ['--database' => 'central']);
     }
 
     /** @test */
@@ -68,7 +60,7 @@ class SoftDeletesTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $tenant = Tenant::find($tenantId);
+        $tenant = \App\Models\Tenant::find($tenantId);
 
         $this->assertDatabaseHas('tenants', ['id' => $tenant->id]);
 
@@ -103,7 +95,7 @@ class SoftDeletesTest extends TestCase
         $this->app->instance(\Stancl\Tenancy\TenantDatabaseManagers\SQLiteDatabaseManager::class, $fakeManager);
 
         // Force delete - should remove the tenant record without throwing.
-        Tenant::withTrashed()->find($tenant->id)->forceDelete();
+        \App\Models\Tenant::withTrashed()->find($tenant->id)->forceDelete();
 
         $this->assertDatabaseMissing('tenants', ['id' => $tenant->id]);
     }

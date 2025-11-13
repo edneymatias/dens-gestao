@@ -19,7 +19,10 @@ class CreateTenantsTable extends Migration
             //$table->string('id')->primary();
             $table->ulid('id')->primary();
             $table->string('name')->nullable()->index();
-            $table->string('db_name')->unique();
+            $table->string('db_name')->nullable()->unique();
+
+            // Provisioning state for reconciliation (pending|provisioning|provisioned|failed)
+            $table->string('provision_state')->default('pending')->index();
 
             // your custom columns may go here
             $table->softDeletes();
