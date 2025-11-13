@@ -12,7 +12,7 @@ use Illuminate\Notifications\Notifiable;
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasAppDefaults;
+    use HasAppDefaults, HasFactory, Notifiable;
 
     /** central tenant connection */
     protected $connection = 'central';

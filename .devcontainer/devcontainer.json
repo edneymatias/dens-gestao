@@ -18,7 +18,6 @@
                 "workbench.colorTheme": "Dracula Theme"
             },
             "extensions": [
-                "laravel.vscode-laravel",
                 "bmewburn.vscode-intelephense-client",
                 "onecentlin.laravel-blade",
                 "aminalaee.laravel-extra-intellisense",
@@ -35,7 +34,8 @@
                 "rangav.vscode-thunder-client",
                 "google.geminicodeassist",
                 "github.vscode-pull-request-github",
-                "ms-azuretools.vscode-containers"
+                "ms-azuretools.vscode-containers",
+                "github.copilot"
             ]
         }
     },
