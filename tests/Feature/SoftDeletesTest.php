@@ -24,7 +24,7 @@ class SoftDeletesTest extends TestCase
         DB::connection('central')->table('users')->insert([
             'id' => $userId,
             'name' => 'Test User',
-            'email' => 'test+' . substr($userId, -6) . '@example.test',
+            'email' => 'test+'.substr($userId, -6).'@example.test',
             'password' => bcrypt('password'),
             'created_at' => now(),
             'updated_at' => now(),
@@ -48,7 +48,7 @@ class SoftDeletesTest extends TestCase
     {
         // Create a tenant record. Stancl's model may generate id if omitted.
         $tenantId = (string) Str::ulid();
-        $dbName = 'tenant_test_' . substr(md5((string) Str::ulid()), 0, 8);
+        $dbName = 'tenant_test_'.substr(md5((string) Str::ulid()), 0, 8);
 
         // Insert directly to ensure db_name column is populated (stancl Tenant may serialize unknown attrs into data)
         DB::table('tenants')->insert([

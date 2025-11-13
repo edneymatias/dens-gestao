@@ -16,7 +16,7 @@ class LocaleMiddlewareTest extends TestCase
      */
     public function test_default_locale_is_en_us(): void
     {
-        $response = $this->get('/');
+        $this->get('/');
 
         $this->assertEquals('en_US', App::getLocale());
     }
@@ -30,7 +30,7 @@ class LocaleMiddlewareTest extends TestCase
 
         $this->actingAs($user);
 
-        $response = $this->get('/');
+        $this->get('/');
 
         $this->assertEquals('pt_BR', App::getLocale());
     }
@@ -40,7 +40,7 @@ class LocaleMiddlewareTest extends TestCase
      */
     public function test_browser_locale_is_used_when_no_user_locale(): void
     {
-        $response = $this->withHeaders([
+        $this->withHeaders([
             'Accept-Language' => 'es-ES,es;q=0.9,en;q=0.8',
         ])->get('/');
 
@@ -52,7 +52,7 @@ class LocaleMiddlewareTest extends TestCase
      */
     public function test_unsupported_locale_falls_back_to_default(): void
     {
-        $response = $this->withHeaders([
+        $this->withHeaders([
             'Accept-Language' => 'fr-FR,fr;q=0.9',
         ])->get('/');
 
@@ -68,7 +68,7 @@ class LocaleMiddlewareTest extends TestCase
 
         $this->actingAs($user);
 
-        $response = $this->withHeaders([
+        $this->withHeaders([
             'Accept-Language' => 'es-ES,es;q=0.9',
         ])->get('/');
 
@@ -77,8 +77,6 @@ class LocaleMiddlewareTest extends TestCase
 
     /**
      * Test that tenant_user locale takes precedence over user locale.
-     * Note: This test requires tenant context setup which is complex.
-     * For now, we'll skip it and focus on the basic functionality.
      */
     public function test_tenant_user_locale_takes_precedence(): void
     {
@@ -88,7 +86,7 @@ class LocaleMiddlewareTest extends TestCase
         \Illuminate\Support\Facades\DB::table('tenants')->insert([
             'id' => $tenantId,
             'name' => 'Tenant Locale Test',
-            'db_name' => 'tenant_test_' . substr(md5((string) \Illuminate\Support\Str::ulid()), 0, 8),
+            'db_name' => 'tenant_test_'.substr(md5((string) \Illuminate\Support\Str::ulid()), 0, 8),
             'data' => json_encode([]),
             'created_at' => now(),
             'updated_at' => now(),
@@ -108,17 +106,19 @@ class LocaleMiddlewareTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        // Initialize tenancy context so middleware can detect current tenant
-        tenancy()->initialize($tenant);
+        try {
+            // Initialize tenancy context so middleware can detect current tenant
+            tenancy()->initialize($tenant);
 
-        $this->actingAs($user);
+            $this->actingAs($user);
 
-        $this->get('/');
+            $this->get('/');
 
-        $this->assertEquals('es_ES', App::getLocale());
-
-        // Teardown tenancy context to avoid leaking state to other tests
-        tenancy()->end();
+            $this->assertEquals('es_ES', App::getLocale());
+        } finally {
+            // Teardown tenancy context to avoid leaking state to other tests
+            tenancy()->end();
+        }
     }
 
     /**
@@ -128,10 +128,8 @@ class LocaleMiddlewareTest extends TestCase
     {
         $user = User::factory()->create(['locale' => 'es_ES']);
 
-        $response = $this->actingAs($user)
-            ->get('/');
+        $this->actingAs($user)->get('/');
 
-        // Verify the locale was set correctly
         $this->assertEquals('es_ES', App::getLocale());
     }
 
@@ -144,7 +142,7 @@ class LocaleMiddlewareTest extends TestCase
 
         $this->actingAs($user);
 
-        $response = $this->get('/');
+        $this->get('/');
 
         $this->assertEquals('pt_BR', App::getLocale());
 
@@ -152,5 +150,31 @@ class LocaleMiddlewareTest extends TestCase
         $date = \Carbon\Carbon::now();
         // Carbon will use the app locale for formatting
         $this->assertTrue(true);
+    }
+
+    /**
+     * Test that partial locale codes are matched to full locales.
+     */
+    public function test_partial_locale_code_is_matched(): void
+    {
+        // Test "es" matches "es_ES"
+        $this->withHeaders([
+            'Accept-Language' => 'es,en;q=0.9',
+        ])->get('/');
+
+        $this->assertEquals('es_ES', App::getLocale());
+    }
+
+    /**
+     * Test that browser locale matching is case-insensitive.
+     */
+    public function test_browser_locale_matching_is_case_insensitive(): void
+    {
+        // Test "PT-br" (mixed case) matches "pt_BR"
+        $this->withHeaders([
+            'Accept-Language' => 'PT-br,pt;q=0.9',
+        ])->get('/');
+
+        $this->assertEquals('pt_BR', App::getLocale());
     }
 }

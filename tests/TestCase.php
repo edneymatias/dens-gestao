@@ -25,8 +25,6 @@ abstract class TestCase extends BaseTestCase
      * Note: RefreshDatabase handles the default connection behavior, but in
      * multi-connection setups we explicitly ensure the 'central' connection
      * migrations are applied deterministically for the suite.
-     *
-     * @var bool
      */
     protected static bool $migrationsRunForSuite = false;
 

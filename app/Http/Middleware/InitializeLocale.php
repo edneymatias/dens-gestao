@@ -121,11 +121,51 @@ class InitializeLocale
             // Remove quality factor if present (e.g., ";q=0.9")
             $locale = trim(explode(';', $locale)[0]);
 
-            // Convert "en-US" to "en_US" format
+            // Convert "en-US" to "en_US" format and normalize case
             $locale = str_replace('-', '_', $locale);
 
-            if ($this->isSupportedLocale($locale)) {
-                return $locale;
+            // Try exact match (case-insensitive)
+            if ($matchedLocale = $this->findSupportedLocale($locale)) {
+                return $matchedLocale;
+            }
+
+            // Try matching just the language part for partial codes (e.g., "es" -> "es_ES")
+            $langCode = explode('_', $locale)[0];
+            if ($matchedLocale = $this->findSupportedLocaleByLanguage($langCode)) {
+                return $matchedLocale;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Find a supported locale with case-insensitive matching.
+     */
+    protected function findSupportedLocale(string $locale): ?string
+    {
+        $supportedLocales = config('app.supported_locales', ['en_US']);
+
+        foreach ($supportedLocales as $supported) {
+            if (strcasecmp($locale, $supported) === 0) {
+                return $supported;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Find a supported locale by matching just the language code.
+     */
+    protected function findSupportedLocaleByLanguage(string $langCode): ?string
+    {
+        $supportedLocales = config('app.supported_locales', ['en_US']);
+
+        foreach ($supportedLocales as $supported) {
+            $supportedLang = explode('_', $supported)[0];
+            if (strcasecmp($langCode, $supportedLang) === 0) {
+                return $supported;
             }
         }
 
