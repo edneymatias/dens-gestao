@@ -65,62 +65,67 @@ Cada item inclui os arquivos alterados e comandos usados.
     -   Racional: estendemos o model do pacote para poder adicionar convenções/traits da aplicação.
 
 -   [RESOLVIDO] Migrations aplicadas com sucesso
+
     -   `php artisan migrate:fresh` executado sem erros e tabelas criadas: `users`, `tenants`, `domains`, `sessions`, etc.
+
+-   [RESOLVIDO] Comando `dens:provision-tenant` e serviço de provisionamento
+
+    -   Arquivos alterados/criados:
+        -   `app/Console/Commands/TenantProvision.php` — comando artisan `dens:provision-tenant` implementado (assinatura: `dens:provision-tenant {name} {--id=} {--seed} {--async}`).
+        -   `app/Services/TenantProvisionService.php` — serviço `TenantProvisionService` que cria o registro do tenant, gera `db_name`, cria o banco físico via o manager do stancl, roda `tenants:migrate` e opcionalmente `tenants:seed`.
+        -   `app/Jobs/ProvisionTenantJob.php` — job assíncrono para provisionamento e reconciliação.
+    -   Comandos/Verificações:
+        -   `php artisan dens:provision-tenant "Acme Inc."` (ou com `--async` para enfileirar).
+        -   Testes unitários presentes: `tests/Unit/TenantProvisionServiceTest.php`, `TenantProvisionServiceSeedTest.php`, `TenantProvisionServiceFailureTest.php`, `TenantProvisionCommandAsyncTest.php`.
+    -   Racional: automatiza a criação do DB do tenant, execução de migrações e seeds, e fornece modo assíncrono/reconciler.
+
+-   [RESOLVIDO] Tabela pivot `tenant_user` criada no landlord
+
+    -   Arquivo criado: `database/migrations/2025_11_13_000030_create_tenant_user_table.php` — usa `foreignUlid('tenant_id')->constrained('tenants')->cascadeOnDelete()` e `foreignUlid('user_id')->constrained('users')->cascadeOnDelete()`, com `role`, `is_owner`, índices e `unique(['tenant_id','user_id'])`.
+    -   Comando executado: `php artisan migrate` (dev).
+    -   Racional: fonte de verdade para membros do tenant e papéis.
+
+-   [RESOLVIDO] Ajuste da migration `domains` para usar `foreignUlid`
+
+    -   Arquivo alterado: `database/migrations/2019_09_15_000020_create_domains_table.php` — `tenant_id` agora é `foreignUlid('tenant_id')->constrained('tenants')->cascadeOnDelete()`.
+    -   Racional: garante integridade referencial e tipo consistente com `tenants.id`.
 
 ## Itens pendentes (PENDENTE) — próximos passos ordenados
 
 Execute um item por vez e reporte quando concluído; eu então liberarei o próximo.
 
-1. (13.2B) Comando `dens:provision-tenant` — criar tenant, gerar db_name seguro, criar DB e rodar migrations do tenant (PRIORITÁRIO)
-
-    - Objetivo: provisionar um tenant completo (cria o registro em `tenants`, cria o database físico usando o TenantDatabaseManager do stancl e roda `tenants:migrate`).
-    - Racional: automatiza e garante que o DB do tenant tem as tabelas do Spatie, Auditing e app.
-    - Observação: eu vou gerar o arquivo de comando pronto para colar quando você confirmar que quer eu entregue agora.
-
-2. (13.3) Criar tabela pivot `tenant_user` (membros do tenant) no landlord
-
--   Objetivo: armazenar quais usuários têm acesso a cada tenant e o papel deles (owner/admin/member). Fonte de verdade para o fluxo de seleção/autorização do tenant.
--   Como: migration no banco central com `tenant_id` e `user_id` como ULIDs, `role`, `is_owner` e índices/unique contra duplicação.
--   Racional: antes de inicializar tenancy pelo `tenant_id` da sessão, o middleware deve checar se o usuário atual é membro do tenant.
-
-3. (13.4) Rodar migrações do Spatie/permission no contexto do tenant
+1. (13.4) Rodar migrações do Spatie/permission no contexto do tenant
 
     - Objetivo: garantir que cada tenant tenha suas próprias tabelas `roles`, `permissions`, etc.
-    - Como: o comando de provisionamento (passo 13.2B) irá executar `tenants:migrate` com os migrations apontando para `database/migrations/tenant` (já configurado em `config/tenancy.php`).
+    - Como: o comando de provisionamento irá executar `tenants:migrate` com os migrations apontando para `database/migrations/tenant` (já configurado em `config/tenancy.php`).
     - Racional: isolar permissões por tenant evita vazamento de privilégio.
 
-4. (13.4) Ajustar tabela `domains` para referenciar tenants por ULID (se aplicável)
-
-    - Status atual: migration `2019_09_15_000020_create_domains_table.php` existe e contém `tenant_id` como string e uma FK que referencia `tenants.id`.
-    - Recomendação: alterar a coluna para `foreignUlid('tenant_id')->constrained('tenants')->cascadeOnDelete()` para garantir integridade referencial e que o tipo corresponda a `tenants.id`.
-    - Observação: esta mudança é segura em novo ambiente. Em produção, aplicar uma migration incremental (adicionar coluna temporária `tenant_ulid`, copiar dados, adicionar FK, remover coluna antiga) — eu posso gerar essa migration segura se necessário.
-
-5. (13.5) Middleware de inicialização de tenancy por sessão
+2. (13.5) Middleware de inicialização de tenancy por sessão
 
     - Objetivo: criar middleware `InitializeTenancyBySession` que verifica `session('tenant_id')` e chama `tenancy()->initialize($tenant)` ou `tenancy()->end()` conforme necessário; ajustar `cache.prefix` dinamicamente.
     - Racional: garante que requests web operem no contexto do tenant selecionado pelo usuário.
 
-6. (13.6) Tenant selection flow (UI + controller)
+3. (13.6) Tenant selection flow (UI + controller)
 
     - Objetivo: rota/controller para listar tenants aos quais o usuário tem acesso e trocar `session('tenant_id')` com `session()->regenerate()`.
     - Racional: UX para trocar de contexto sem logout.
 
-7. (13.7) Jobs / Queues: padronizar tenant context in background jobs
+4. (13.7) Jobs / Queues: padronizar tenant context in background jobs
 
     - Objetivo: garantir que jobs carreguem `tenant_id` no payload, e no `handle()` chamem `tenancy()->initialize($tenant)` antes de operar.
     - Racional: workers não têm sessão — precisamos passar contexto explicitamente.
 
-8. (13.8) Filament 4 + Filament Shield integration
+5. (13.8) Filament 4 + Filament Shield integration
 
     - Objetivo: garantir Filament resources consultem Spatie tables do tenant quando tenancy estiver inicializada e separar painel landlord/global do painel tenant.
 
-9. (13.9) owen-it/laravel-auditing
+6. (13.9) owen-it/laravel-auditing
 
     - Objetivo: configurar auditing para escrever em DB do tenant (rodar migração do auditing no tenant durante provisionamento).
 
-10. (13.10) Tests automáticos mínimos
+7. (13.10) Tests automáticos mínimos
 
--   Escrever testes feature para fluxo: login central → escolher tenant → criar recurso tenant-scoped → confirmar está no DB do tenant; job with tenant_id; spatie permissions are isolated.
+    - Escrever testes feature para fluxo: login central → escolher tenant → criar recurso tenant-scoped → confirmar está no DB do tenant; job with tenant_id; spatie permissions are isolated.
 
 ## Racionais e notas técnicas (curtas)
 
