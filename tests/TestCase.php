@@ -4,7 +4,6 @@ namespace Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
-use Illuminate\Support\Facades\Artisan;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -21,7 +20,8 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
-        // Ensure migrations also run for the 'central' connection which some models use.
-        Artisan::call('migrate:fresh', ['--database' => 'central']);
+        // The 'central' connection is included in $connectionsToTransact so
+        // RefreshDatabase will handle migrations for it. No need to run
+        // migrate:fresh on every test which is expensive.
     }
 }
