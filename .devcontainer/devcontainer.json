@@ -1,0 +1,43 @@
+{
+    "name": "Dens Gestão (Laravel)",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": 25
+        }
+    },
+    "customizations": {
+        "vscode": {
+            // Configurações do VS Code para este projeto
+            "settings": {
+                "editor.formatOnSave": true, // Formata ao salvar
+                "files.trimTrailingWhitespace": true, // Remove espaços extras no fim das linhas
+                "workbench.iconTheme": "material-icon-theme",
+                "workbench.colorTheme": "Dracula Theme"
+            },
+            "extensions": [
+                "laravel.vscode-laravel",
+                "bmewburn.vscode-intelephense-client",
+                "onecentlin.laravel-blade",
+                "aminalaee.laravel-extra-intellisense",
+                "shufo.vscode-blade-formatter",
+                "mikestead.dotenv",
+                "mtxr.sqltools",
+                "mtxr.sqltools-driver-sqlite",
+                "esbenp.prettier-vscode",
+                "usernamehw.errorlens",
+                "dracula-theme.theme-dracula",
+                "compulim.vscode-clock",
+                "thang-nm.flow-icons",
+                "pkief.material-icon-theme",
+                "rangav.vscode-thunder-client",
+                "google.geminicodeassist",
+                "github.vscode-pull-request-github",
+                "ms-azuretools.vscode-containers"
+            ]
+        }
+    },
+    "forwardPorts": [8000, 5173]
+}
