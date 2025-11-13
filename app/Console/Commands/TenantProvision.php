@@ -14,7 +14,7 @@ class TenantProvision extends Command
      *
      * @var string
      */
-    protected $signature = 'dens:provision-tenant {name} {--id=} {--seed} {--async} {--force}';
+    protected $signature = 'dens:provision-tenant {name} {--id=} {--seed} {--async}';
 
     /**
      * The console command description.
