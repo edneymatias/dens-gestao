@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\Tenant;
-use App\Services\TenantProvisionService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -24,13 +23,9 @@ class TenantProvisionReconcile extends Command
      */
     protected $description = 'Reconcile tenants stuck in provisioning state and attempt to complete provisioning.';
 
-    protected TenantProvisionService $service;
-
-    public function __construct(TenantProvisionService $service)
+    public function __construct()
     {
         parent::__construct();
-
-        $this->service = $service;
     }
 
     public function handle(): int
