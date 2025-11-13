@@ -82,7 +82,43 @@ class LocaleMiddlewareTest extends TestCase
      */
     public function test_tenant_user_locale_takes_precedence(): void
     {
-        $this->markTestSkipped('Tenant context setup required for this test');
+        // Create a tenant record in the central DB
+        $tenantId = (string) \Illuminate\Support\Str::ulid();
+
+        \Illuminate\Support\Facades\DB::table('tenants')->insert([
+            'id' => $tenantId,
+            'name' => 'Tenant Locale Test',
+            'db_name' => 'tenant_test_' . substr(md5((string) \Illuminate\Support\Str::ulid()), 0, 8),
+            'data' => json_encode([]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $tenant = \App\Models\Tenant::find($tenantId);
+
+        $user = User::factory()->create(['locale' => 'pt_BR']);
+
+        // Insert a tenant_user row that overrides the user's locale for this tenant
+        \Illuminate\Support\Facades\DB::connection('central')->table('tenant_user')->insert([
+            'tenant_id' => $tenantId,
+            'user_id' => $user->id,
+            'role' => 'member',
+            'locale' => 'es_ES',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Initialize tenancy context so middleware can detect current tenant
+        tenancy()->initialize($tenant);
+
+        $this->actingAs($user);
+
+        $this->get('/');
+
+        $this->assertEquals('es_ES', App::getLocale());
+
+        // Teardown tenancy context to avoid leaking state to other tests
+        tenancy()->end();
     }
 
     /**

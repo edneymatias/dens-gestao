@@ -14,8 +14,8 @@ class SoftDeletesTest extends TestCase
         parent::setUp();
     }
 
-    /** @test */
-    public function user_can_be_soft_deleted_and_restored()
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function user_can_be_soft_deleted_and_restored(): void
     {
         // Insert directly on the central connection to avoid multi-connection
         // transaction/migration complexity in this test environment.
@@ -24,7 +24,7 @@ class SoftDeletesTest extends TestCase
         DB::connection('central')->table('users')->insert([
             'id' => $userId,
             'name' => 'Test User',
-            'email' => 'test+'.substr($userId, -6).'@example.test',
+            'email' => 'test+' . substr($userId, -6) . '@example.test',
             'password' => bcrypt('password'),
             'created_at' => now(),
             'updated_at' => now(),
@@ -43,12 +43,12 @@ class SoftDeletesTest extends TestCase
         $this->assertDatabaseHas('users', ['id' => $user->id, 'deleted_at' => null], 'central');
     }
 
-    /** @test */
-    public function tenant_soft_delete_marks_trashed_and_force_delete_removes_record_and_calls_db_manager()
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function tenant_soft_delete_marks_trashed_and_force_delete_removes_record_and_calls_db_manager(): void
     {
         // Create a tenant record. Stancl's model may generate id if omitted.
         $tenantId = (string) Str::ulid();
-        $dbName = 'tenant_test_'.substr(md5((string) Str::ulid()), 0, 8);
+        $dbName = 'tenant_test_' . substr(md5((string) Str::ulid()), 0, 8);
 
         // Insert directly to ensure db_name column is populated (stancl Tenant may serialize unknown attrs into data)
         DB::table('tenants')->insert([
