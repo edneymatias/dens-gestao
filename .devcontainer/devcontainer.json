@@ -18,7 +18,6 @@
                 "workbench.colorTheme": "Dracula Theme"
             },
             "extensions": [
-                "laravel.vscode-laravel",
                 "bmewburn.vscode-intelephense-client",
                 "onecentlin.laravel-blade",
                 "aminalaee.laravel-extra-intellisense",
