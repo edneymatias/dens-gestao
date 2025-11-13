@@ -3,10 +3,11 @@
 namespace App\Concerns;
 
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 trait HasAppDefaults
 {
-    use HasUlids;
+    use HasUlids, SoftDeletes;
 
     /**
      * Optional default casts for models that want them.
