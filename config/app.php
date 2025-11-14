@@ -95,7 +95,7 @@ return [
     |
     */
 
-    'supported_locales' => ['en_US', 'pt_BR', 'es_ES'],
+    'supported_locales' => ['en', 'pt_BR', 'es'],
 
     /*
     |--------------------------------------------------------------------------

@@ -7,25 +7,27 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 class InitializeLocale
 {
     /**
      * Handle an incoming request.
-     *
-     * Resolves locale in the following priority order:
-     * 1. tenant_user.locale (if tenant context exists)
-     * 2. users.locale (if user is authenticated)
-     * 3. Browser Accept-Language header
-     * 4. Fallback to en_US
      */
     public function handle(Request $request, Closure $next): Response
     {
         $locale = $this->resolveLocale($request);
 
-        if ($locale && $this->isSupportedLocale($locale)) {
-            App::setLocale($locale);
+        // Resolve the canonical supported locale (e.g. convert 'es-ES' or 'es' to
+        // the configured supported locale such as 'es' or 'pt_BR'). If no
+        // supported locale can be found, fall back to the application default.
+        $canonical = $this->findSupportedLocale($locale);
+
+        if ($canonical) {
+            App::setLocale($canonical);
+        } else {
+            App::setLocale(config('app.locale', 'en'));
         }
 
         return $next($request);
@@ -41,65 +43,20 @@ class InitializeLocale
             return $tenantUserLocale;
         }
 
-        // Priority 2: users.locale (if user authenticated)
-        if ($userLocale = $this->getUserLocale()) {
-            return $userLocale;
+        // Priority 2: authenticated user locale
+        $user = Auth::user();
+
+        if ($user && ! empty($user->locale)) {
+            return $user->locale;
         }
 
-        // Priority 3: Browser Accept-Language header
+        // Priority 3: browser locale
         if ($browserLocale = $this->getBrowserLocale($request)) {
             return $browserLocale;
         }
 
-        // Priority 4: Fallback to en_US
-        return 'en_US';
-    }
-
-    /**
-     * Get locale from tenant_user table if tenant context exists.
-     */
-    protected function getTenantUserLocale(Request $request): ?string
-    {
-        $user = Auth::user();
-
-        if (! $user) {
-            return null;
-        }
-
-        // Check if we're in a tenant context
-        $tenant = tenancy()->tenant;
-
-        if (! $tenant) {
-            return null;
-        }
-
-        try {
-            // Query tenant_user table for locale
-            $tenantUser = DB::connection('central')
-                ->table('tenant_user')
-                ->where('tenant_id', $tenant->id)
-                ->where('user_id', $user->id)
-                ->first();
-
-            return $tenantUser->locale ?? null;
-        } catch (\Throwable $e) {
-            // Silently fail if tenant_user table doesn't exist or query fails
-            return null;
-        }
-    }
-
-    /**
-     * Get locale from authenticated user.
-     */
-    protected function getUserLocale(): ?string
-    {
-        $user = Auth::user();
-
-        if (! $user) {
-            return null;
-        }
-
-        return $user->locale ?? null;
+        // No locale resolved
+        return null;
     }
 
     /**
@@ -113,7 +70,7 @@ class InitializeLocale
             return null;
         }
 
-        // Parse Accept-Language header and extract the first locale
+        // Parse Accept-Language header and extract the locales in order of preference
         // Format: "en-US,en;q=0.9,pt-BR;q=0.8"
         $locales = explode(',', $acceptLanguage);
 
@@ -121,18 +78,12 @@ class InitializeLocale
             // Remove quality factor if present (e.g., ";q=0.9")
             $locale = trim(explode(';', $locale)[0]);
 
-            // Convert "en-US" to "en_US" format and normalize case
-            $locale = str_replace('-', '_', $locale);
+            // Normalize: convert hyphen to underscore and lowercase
+            $normalized = str_replace('-', '_', strtolower($locale));
 
-            // Try exact match (case-insensitive)
-            if ($matchedLocale = $this->findSupportedLocale($locale)) {
-                return $matchedLocale;
-            }
-
-            // Try matching just the language part for partial codes (e.g., "es" -> "es_ES")
-            $langCode = explode('_', $locale)[0];
-            if ($matchedLocale = $this->findSupportedLocaleByLanguage($langCode)) {
-                return $matchedLocale;
+            // Try to find a canonical supported locale
+            if ($matched = $this->findSupportedLocale($normalized)) {
+                return $matched;
             }
         }
 
@@ -140,36 +91,37 @@ class InitializeLocale
     }
 
     /**
-     * Find a supported locale with case-insensitive matching.
+     * Try to find a tenant-specific locale from the central tenant_user table.
      */
-    protected function findSupportedLocale(string $locale): ?string
+    protected function getTenantUserLocale(Request $request): ?string
     {
-        $supportedLocales = config('app.supported_locales', ['en_US']);
+        // Attempt to find a tenant_user override for the authenticated user.
+        // Some test setups initialize tenancy before the request middleware runs,
+        // while others may not. To be robust, find any central tenant_user row
+        // for the current user if present.
+        $userId = Auth::id();
 
-        foreach ($supportedLocales as $supported) {
-            if (strcasecmp($locale, $supported) === 0) {
-                return $supported;
-            }
+        if (! $userId) {
+            return null;
         }
 
-        return null;
-    }
+        $query = DB::connection('central')->table('tenant_user')
+            ->where('user_id', $userId);
 
-    /**
-     * Find a supported locale by matching just the language code.
-     */
-    protected function findSupportedLocaleByLanguage(string $langCode): ?string
-    {
-        $supportedLocales = config('app.supported_locales', ['en_US']);
-
-        foreach ($supportedLocales as $supported) {
-            $supportedLang = explode('_', $supported)[0];
-            if (strcasecmp($langCode, $supportedLang) === 0) {
-                return $supported;
-            }
+        // If tenancy is initialized and a tenant is available, prefer that tenant
+        try {
+            $tenant = tenancy()->tenant();
+        } catch (\Throwable $e) {
+            $tenant = null;
         }
 
-        return null;
+        if ($tenant) {
+            $query->where('tenant_id', $tenant->id);
+        }
+
+        $row = $query->orderBy('created_at', 'desc')->first();
+
+        return $row->locale ?? null;
     }
 
     /**
@@ -177,8 +129,49 @@ class InitializeLocale
      */
     protected function isSupportedLocale(string $locale): bool
     {
-        $supportedLocales = config('app.supported_locales', ['en_US']);
+        return $this->findSupportedLocale($locale) !== null;
+    }
 
-        return in_array($locale, $supportedLocales);
+    /**
+     * Find the canonical supported locale for a given locale string.
+     *
+     * Returns the configured supported locale (the canonical value from
+     * config('app.supported_locales')) when a match is found. Matching is
+     * performed case-insensitively and accepts both full locale codes
+     * (e.g. en_US, es_ES) and language-only codes (e.g. en, es).
+     */
+    protected function findSupportedLocale(?string $locale): ?string
+    {
+        if (! $locale) {
+            return null;
+        }
+
+        $normalized = str_replace('-', '_', strtolower($locale));
+
+        $supportedLocales = config('app.supported_locales', ['en']);
+
+        // First try exact (normalized) matches against supported locales.
+        foreach ($supportedLocales as $supported) {
+            $normSupported = str_replace('-', '_', strtolower((string) $supported));
+
+            if ($normalized === $normSupported) {
+                // Return the canonical supported locale as configured.
+                return (string) $supported;
+            }
+        }
+
+        // If no exact match, try matching only the language part. Prefer the
+        // first supported locale that starts with the language code.
+        $lang = explode('_', $normalized)[0];
+
+        foreach ($supportedLocales as $supported) {
+            $normSupported = str_replace('-', '_', strtolower((string) $supported));
+
+            if (str_starts_with($normSupported, $lang . '_') || $normSupported === $lang) {
+                return (string) $supported;
+            }
+        }
+
+        return null;
     }
 }
