@@ -30,7 +30,7 @@ class TenantProvisionService
         $name = $data['name'] ?? null;
 
         if (! $name) {
-            throw new InvalidArgumentException('The tenant name is required.');
+            throw new InvalidArgumentException(__('services.tenant_name_required'));
         }
 
         $id = $data['id'] ?? null;
@@ -71,7 +71,7 @@ class TenantProvisionService
 
         // Ensure tenant was created inside the transaction.
         if (! $tenant) {
-            throw new RuntimeException('Tenant model was not created.');
+            throw new RuntimeException(__('services.tenant_model_not_created'));
         }
 
         // Mark as provisioning so reconcilers / UI can show progress.

@@ -14,8 +14,8 @@ class SoftDeletesTest extends TestCase
         parent::setUp();
     }
 
-    /** @test */
-    public function user_can_be_soft_deleted_and_restored()
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function user_can_be_soft_deleted_and_restored(): void
     {
         // Insert directly on the central connection to avoid multi-connection
         // transaction/migration complexity in this test environment.
@@ -43,8 +43,8 @@ class SoftDeletesTest extends TestCase
         $this->assertDatabaseHas('users', ['id' => $user->id, 'deleted_at' => null], 'central');
     }
 
-    /** @test */
-    public function tenant_soft_delete_marks_trashed_and_force_delete_removes_record_and_calls_db_manager()
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function tenant_soft_delete_marks_trashed_and_force_delete_removes_record_and_calls_db_manager(): void
     {
         // Create a tenant record. Stancl's model may generate id if omitted.
         $tenantId = (string) Str::ulid();

@@ -16,12 +16,22 @@ abstract class TestCase extends BaseTestCase
      */
     protected $connectionsToTransact = ['central'];
 
+    /**
+     * Ensure migrations for required connections run before each test.
+     *
+     * Running migrations per-test increases isolation at the cost of speed,
+     * but keeps the test suite hermetic in multi-connection setups. The
+     * previous static-flag approach caused intermittent issues and weaker
+     * isolation, so we prefer the safer per-test migrations.
+     */
     protected function setUp(): void
     {
         parent::setUp();
 
-        // The 'central' connection is included in $connectionsToTransact so
-        // RefreshDatabase will handle migrations for it. No need to run
-        // migrate:fresh on every test which is expensive.
+        // Run migrations per-test to ensure isolation across the test suite.
+        // RefreshDatabase handles the default connection, but explicitly run
+        // migrations for the 'central' connection as well.
+        $this->artisan('migrate', ['--force' => true]);
+        $this->artisan('migrate', ['--database' => 'central', '--force' => true]);
     }
 }
