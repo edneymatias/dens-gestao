@@ -84,7 +84,7 @@ class LocaleMiddlewareTest extends TestCase
         \Illuminate\Support\Facades\DB::table('tenants')->insert([
             'id' => $tenantId,
             'name' => 'Tenant Locale Test',
-            'db_name' => 'tenant_test_' . substr(md5((string) \Illuminate\Support\Str::ulid()), 0, 8),
+            'db_name' => 'tenant_test_'.substr(md5((string) \Illuminate\Support\Str::ulid()), 0, 8),
             'data' => json_encode([]),
             'created_at' => now(),
             'updated_at' => now(),

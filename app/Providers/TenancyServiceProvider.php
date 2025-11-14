@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use Illuminate\Contracts\Foundation\CachesRoutes;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -121,10 +122,18 @@ class TenancyServiceProvider extends ServiceProvider
     protected function mapRoutes()
     {
         $this->app->booted(function () {
-            if (file_exists(base_path('routes/tenant.php'))) {
-                Route::namespace(static::$controllerNamespace)
-                    ->group(base_path('routes/tenant.php'));
+            $routeFile = base_path('routes/tenant.php');
+
+            if (! file_exists($routeFile)) {
+                return;
             }
+
+            if ($this->app instanceof CachesRoutes && $this->app->routesAreCached()) {
+                return;
+            }
+
+            Route::namespace(static::$controllerNamespace)
+                ->group($routeFile);
         });
     }
 

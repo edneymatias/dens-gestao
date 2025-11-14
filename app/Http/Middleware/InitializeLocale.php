@@ -7,7 +7,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 class InitializeLocale
@@ -167,7 +166,7 @@ class InitializeLocale
         foreach ($supportedLocales as $supported) {
             $normSupported = str_replace('-', '_', strtolower((string) $supported));
 
-            if (str_starts_with($normSupported, $lang . '_') || $normSupported === $lang) {
+            if (str_starts_with($normSupported, $lang.'_') || $normSupported === $lang) {
                 return (string) $supported;
             }
         }
