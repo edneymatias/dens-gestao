@@ -22,7 +22,7 @@ class InitializeTenancyBySessionTest extends TestCase
 
         $tenant = Tenant::query()->create([
             'name' => 'Session Tenant',
-            'db_name' => 'tenant_' . Str::lower(Str::random(10)),
+            'db_name' => 'tenant_'.Str::lower(Str::random(10)),
         ]);
 
         $basePrefix = config('cache.prefix');

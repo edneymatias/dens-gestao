@@ -43,6 +43,20 @@ return [
             'transaction_mode' => 'DEFERRED',
         ],
 
+        // Template connection used to build tenant connections. Named differently
+        // than 'tenant' because the package manages the actual 'tenant' connection.
+        'tenant_template' => [
+            'driver' => 'sqlite',
+            'url' => env('DB_TENANT_URL'),
+            'database' => env('DB_TENANT_TEMPLATE_DATABASE', database_path('tenant_template.sqlite')),
+            'prefix' => '',
+            'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
+            'busy_timeout' => null,
+            'journal_mode' => null,
+            'synchronous' => null,
+            'transaction_mode' => 'DEFERRED',
+        ],
+
         'central' => [
             'driver' => 'sqlite',
             'url' => env('DB_CENTRAL_URL'),

@@ -180,19 +180,156 @@ php artisan migrate:fresh
 
 ## Próximo passo imediato (faça só um item)
 
--   Quero que você peça explicitamente: `Gerar comando provision`, `Criar tenant_user migration` ou `Editar domains migration`.
+-   Nossa prioridade atual é implementar a infraestrutura de seleção de tenant via Filament + Spatie (13.6 → 13.8).
 
-Se escolher **Gerar comando provision**, eu te entrego o arquivo completo do comando artisan `dens:provision-tenant` pronto para colar em `app/Console/Commands/TenantProvision.php`. Ele irá:
+Escolha explícita de ação abaixo (faça um item por vez):
 
--   aceitar nome e opcional id ULID,
--   gerar ULID se não fornecido,
--   gerar `db_name` seguro (prefix + md5 short),
--   criar o tenant (persistir em `tenants`),
--   chamar `tenancy()->createDatabase()` via manager (usando `DatabaseConfig` do stancl),
--   executar `tenants:migrate` para rodar migrations do tenant,
--   opcionalmente rodar `tenants:seed`.
+-   `Instalar e configurar Filament` — cria o painel landlord que fornecerá a UI para seleção de tenant e administração.
+-   `Criar endpoint de seleção de tenant` — endpoint seguro que valida membership e seta `session('tenant_id')` com `session()->regenerate()` (infra para Filament consumir).
+-   `Gerar comando provision` — (opcional) gerar o comando artisan `dens:provision-tenant` pronto para colar em `app/Console/Commands/TenantProvision.php`.
 
-Se escolher **Editar domains migration**, eu te entrego o patch pronto para ajustar `tenant_id` para `foreignUlid(...)` e as instruções para rodar uma migration segura em produção.
+Se escolher `Instalar e configurar Filament`, eu: instalarei o pacote Filament (versão compatível com Laravel 12), aplicarei as publicações necessárias, e criarei um Page/Table action mínimo que consome o endpoint de seleção de tenant.
+
+Se escolher `Criar endpoint de seleção de tenant`, eu: criarei o controller, rotas e testes feature que garantem que a sessão é atualizada e que o middleware `InitializeTenancyBySession` inicializa o tenancy no próximo request.
+
+## Super‑Admin (Landlord) — implementação e segurança (novo)
+
+Última atualização: 2025-11-14
+
+Para proteger o painel landlord recomendamos um fluxo simples e auditável:
+
+-   **Flag no usuário**: campo booleano `is_superadmin` em `users` (default `false`).
+-   **Gate::before**: regra global que concede todas as abilities quando `is_superadmin === true`.
+-   **Middleware de proteção**: `EnsureSuperAdmin` para proteger rotas/painel sensíveis (Filament landlord).
+-   **Seeder operacional**: `SuperAdminSeeder` para criar/atualizar o usuário inicial usando `SUPERADMIN_EMAIL`/`SUPERADMIN_PASSWORD` do ambiente.
+-   **Testes**: cobertura feature que valida Gate::before e o middleware de acesso ao painel.
+
+Implementação recomendada (passos concretos):
+
+1. Migration: `2025_11_14_000100_add_is_superadmin_to_users_table.php` — adiciona `is_superadmin` boolean (default false) após `password`.
+2. Seeder: `database/seeders/SuperAdminSeeder.php` — `User::firstOrNew(['email' => env('SUPERADMIN_EMAIL')])`, define `is_superadmin = true` e `password` vindo de `env('SUPERADMIN_PASSWORD')` (recomenda-se trocar a senha em produção e habilitar 2FA).
+3. `Gate::before`: adicionar em `App\\Providers\\AppServiceProvider::boot()` (ou `AuthServiceProvider` se preferir) a regra:
+
+```php
+Gate::before(fn (?User $user, $ability) => $user && $user->is_superadmin ? true : null);
+```
+
+4. Middleware: `app/Http/Middleware/EnsureSuperAdmin.php` — aborta `403` quando o usuário autenticado não é superadmin. Registrar o middleware nas rotas Filament landlord via `config/filament.php` (adicionar à chave `middleware`).
+
+5. Tests: `tests/Feature/SuperAdminAccessTest.php` — casos:
+
+    - Super‑admin obtém `Gate::allows('any-ability') === true`.
+    - Usuário normal não obtém acesso a abilities não definidas.
+    - Middleware `EnsureSuperAdmin` retorna 403 para usuário não-superadmin quando acessa rota protegida.
+
+Operacional / segurança (checklist curto):
+
+-   Habilitar 2FA para contas superadmin em produção.
+-   Registrar auditoria (quem tornou alguém superadmin) — preferencialmente via eventos/listener que emite `UserPromotedToSuperAdmin`.
+-   Ter processo manual (ou via CI) para rotacionar a senha do superadmin quando necessário; evitar uso de senha padrão em produção.
+-   Limitar acesso administrativo por IP/ACL e monitorar falhas de autenticação.
+
+Critério de aceitação:
+
+-   O painel landlord só é acessível por usuários com `is_superadmin = true` (ou accounts autorizadas manualmente).
+-   `Gate::before` garante permissões elevadas no contexto landlord sem afetar a consistência das verificações de permissão per-tenant.
+
+## Suporte a Mobile (adicionado)
+
+Última atualização: 2025-11-14
+
+Observação: a interface do usuário será provida pelo Filament (landlord). Para clientes mobile futuros, precisamos garantir autenticação token-based e inicialização explícita do tenancy por token/headers — a sessão central usada pelo navegador não serve para mobile.
+
+Recomendações e checklist mínimo:
+
+-   **Autenticação API**: adicionar `laravel/sanctum` para emitir personal access tokens, ou `laravel/passport` se OAuth2 for necessário. Tokens podem ser scoped por `tenant_id`.
+-   **Middleware API de tenancy**: criar `InitializeTenancyByTokenOrHeader` que extrai `tenant_id` do token claims ou do header `X-Tenant-Id`, valida o acesso do usuário ao tenant (checar `tenant_user`) e chama `tenancy()->initialize($tenant)`.
+-   **Tokens scoped**: preferir emitir tokens já vinculados a um `tenant_id` (scoped tokens) para reduzir superfície de erro do cliente.
+-   **Endpoints**: fornecer endpoints `/api/v1/login`, `/api/v1/token/revoke`, `/api/v1/me` com exemplos de payload e explicações de headers obrigatórios (`Authorization: Bearer <token>`, `X-Tenant-Id: <ulid>` — se não for scoped).
+-   **Jobs & background**: jobs disparados pela API devem receber `tenant_id` no payload e inicializar tenancy no worker (13.7).
+-   **Rate limiting & observability**: aplicar rate limits por token/tenant e registrar `tenant_id` em logs/metrics.
+
+Próximo passo relacionado a mobile (depois de Filament+Spatie): implementar `Sanctum` + `InitializeTenancyByTokenOrHeader` e um conjunto mínimo de testes que cobrem login, seleção de tenant por token, e criação de recurso tenant-scoped via API.
+
+## Filament 4 — integração (detalhes e próximos passos)
+
+Última atualização: 2025-11-14
+
+Esta seção resume as recomendações práticas para instalar e integrar o **Filament 4** com a nossa infraestrutura de tenancy e com o `spatie/laravel-permission` (Filament Shield). Segue um plano de trabalho alinhado às práticas da versão 4 do Filament.
+
+Principais decisões
+
+-   O painel **landlord** (admin central) roda sobre o `users` central e deve usar a sessão central (`web` guard).
+-   Os recursos que operam sobre dados do tenant devem executar somente depois que `InitializeTenancyBySession` tiver inicializado o tenant.
+-   A integração com permissões (Spatie) será feita via Filament Shield (ou equivalente) e executará no DB do tenant quando o tenancy estiver ativo.
+
+Instalação mínima
+
+1. Instalar o Filament (ajuste a versão se necessário):
+
+```bash
+composer require filament/filament:^4.1
+php artisan filament:install
+php artisan vendor:publish --tag=filament-config
+npm install && npm run build
+```
+
+2. Publicar e revisar o `config/filament.php` gerado.
+
+Configurações recomendadas (ajustes em `config/filament.php`)
+
+-   `auth` / `guard`: garanta que o painel landlord use o `web` guard apontando para o `App\\Models\\User` central. Ex.: `guard => 'web'`.
+-   `middleware`: inclua `web` e `auth` como padrão (o instalador faz isso). Para ter certeza que o tenancy está disponível dentro das rotas do Filament, confirme que o middleware `InitializeTenancyBySession` está registrado no grupo `web` (já o registramos em `bootstrap/app.php`). Se preferir, adicione explicitamente o middleware nas rotas do Filament via `config/filament.php` — por exemplo:
+
+```php
+'middleware' => ['web', \\App\\Http\\Middleware\\InitializeTenancyBySession::class, 'auth'],
+```
+
+Observação: a ordem importa — `InitializeTenancyBySession` precisa executar antes de qualquer checagem de permissões/recursos que dependam do tenant.
+
+Landlord x Tenant panels
+
+-   Recomendamos manter o painel landlord como o painel Filament principal (prefix `/admin` ou `filament`) autenticado contra o usuário central.
+-   Para o painel tenant (se for necessário oferecer painel por tenant), criar um painel separado (outro prefix/guard) ou usar o mesmo painel com o middleware de tenancy ativo — dependerá da UX desejada. Importante: não permitir que o painel landlord use o contexto do tenant por acidente.
+
+Filament Shield e Spatie
+
+-   Instale e configure o pacote de integração entre Filament e Spatie (Filament Shield). Ele deve ser instalado após o Spatie já ter suas migrations preparadas para rodar por tenant (já temos `database/migrations/tenant/...` prontas).
+-   Workflow recomendado:
+    1. Instalar Filament Shield (seguir instruções do pacote escolhido).
+    2. Publicar resources/permissions e sincronizar roles/permissions por tenant (quando tenancy estiver inicializado).
+    3. Gerar policies e recursos Filament que utilizam `can()`/`hasPermissionTo()` normalmente — as checagens rodarão no contexto do tenant se `tenancy()->initialized` for true.
+
+Pontos de atenção
+
+-   Migrations do Spatie devem ser executadas no DB do tenant durante o provisionamento (já preparado no passo 13.4). Não execute as migrations do Spatie no landlord.
+-   Se usar recursos Filament que chamam Eloquent models tenant-scoped, garanta que as queries sejam executadas apenas após a inicialização do tenancy (middleware em posição correta e testes cobrindo o fluxo).
+-   Filament's navigation / visibility callbacks podem chamar `auth()->user()->can(...)` — essas chamadas dependem de tenancy se as permissões forem tenant-scoped.
+
+Tarefas e checklist (próximos passos concretos)
+
+1. Instalar Filament (rodar os comandos acima) e revisar `config/filament.php`. [DEV]
+2. Ajustar `config/filament.php` para garantir `InitializeTenancyBySession` roda para todas as rotas do Filament ou confiar no registro global do middleware em `web`. [DEV]
+3. Criar uma `Filament Page` ou `Resource` (landlord) que consuma `GET /tenants` e dispare `POST /tenants/select` (ação de Table/Modal). [DEV]
+4. Instalar Filament Shield e configurar a integração com `spatie/laravel-permission`. Rodar as publicações necessárias. [DEV]
+5. Escrever testes feature que cobrem: login landlord → seleção de tenant via Filament action → requests subsequentes executam no DB do tenant; permissões via Spatie estão ativas no contexto do tenant. [TEST]
+6. Documentar os passos e arquivos alterados (atualizar este doc com os arquivos criados). [DOC]
+
+Critérios de aceitação
+
+-   Painel Filament landlord lista tenants do usuário e consegue trocar o tenant ativo com sucesso.
+-   Após seleção via Filament, `tenancy()->initialized()` é true e as operações CRUD gravam no DB do tenant.
+-   Filament Shield aplica permissões usando as tabelas Spatie do tenant (quando tenancy ativo).
+
+Estimativa e ordem de execução sugerida
+
+-   Fase 1 (1 dia): Instalar Filament, publicar config, ajustar middleware e criar uma Page mínima para seleção de tenant (consumindo os endpoints já implementados).
+-   Fase 2 (1 dia): Instalar Filament Shield, configurar integração com Spatie, garantir migrations por-tenant.
+-   Fase 3 (0.5–1 dia): Escrever testes feature e ajustar pequenas falhas.
+
+Notas finais
+
+Seguindo essa abordagem alinhada ao Filament 4, a interface de administração e seleção de tenant fica padronizada, testável e reaproveitável. Depois de completarmos Filament + Spatie, passamos para o suporte mobile (Sanctum) conforme checklist já adicionado.
 
 ---
 

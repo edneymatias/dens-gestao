@@ -45,7 +45,7 @@ return [
          * Connection used as a "template" for the dynamically created tenant database connection.
          * Note: don't name your template connection tenant. That name is reserved by package.
          */
-        'template_tenant_connection' => null,
+        'template_tenant_connection' => 'tenant_template',
 
         /**
          * Tenant database names are created like this:
@@ -185,7 +185,7 @@ return [
      */
     'migration_parameters' => [
         '--force' => true, // This needs to be true to run migrations in production.
-        '--path' => [database_path('migrations/tenant')],
+        '--path' => [realpath(database_path('migrations/tenant')) ?: database_path('migrations/tenant')],
         '--realpath' => true,
     ],
 

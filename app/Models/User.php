@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Concerns\HasAppDefaults;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -50,5 +51,15 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Tenants this user belongs to (landlord pivot `tenant_user`).
+     */
+    public function tenants(): BelongsToMany
+    {
+        return $this->belongsToMany(Tenant::class, 'tenant_user', 'user_id', 'tenant_id')
+            ->using(\Illuminate\Database\Eloquent\Relations\Pivot::class)
+            ->withTimestamps();
     }
 }

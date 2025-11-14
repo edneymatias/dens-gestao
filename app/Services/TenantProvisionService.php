@@ -85,7 +85,29 @@ class TenantProvisionService
         // Now create the physical database via the manager (outside the transaction).
         try {
             $tenant->database()->manager()->createDatabase($tenant);
+
+            // If the manager created a zero-byte sqlite file (some managers simply touch the file),
+            // remove it so that SQLite/PDO can initialize and create a valid database file on first connection.
+            try {
+                $dbName = $tenant->database()->getName();
+                $dbPath = database_path($dbName);
+
+                if (file_exists($dbPath) && filesize($dbPath) === 0) {
+                    Log::warning('Tenant DB file is zero bytes; removing to allow SQLite to initialize', ['path' => $dbPath, 'tenant' => $tenant->getTenantKey()]);
+                    @unlink($dbPath);
+                }
+                // Ensure a valid SQLite DB file exists by opening a PDO connection which will initialize it.
+                try {
+                    $pdo = new \PDO('sqlite:'.$dbPath);
+                    $pdo->exec('PRAGMA user_version = 1;');
+                } catch (Throwable $_) {
+                    // ignore - migrations may still fail with a clearer error which we'll capture
+                }
+            } catch (Throwable $_) {
+                // Non-fatal — proceed to migrations and let them fail with a clearer error if something is wrong.
+            }
         } catch (Throwable $e) {
+            Log::error('Tenant provisioning failed creating physical database: '.$e->getMessage());
             Log::error('Tenant provisioning failed creating physical database: '.$e->getMessage());
 
             // Attempt cleanup: remove tenant record if DB creation failed.
@@ -101,19 +123,60 @@ class TenantProvisionService
         }
 
         try {
+
             if ($migrate) {
-                Artisan::call('tenants:migrate', [
+                // Ensure the tenant connection config is created and the default connection
+                // is switched to 'tenant' before running migrations. This makes the
+                // migrator operate on the tenant DB even in cases where the bootstrap
+                // order may not have set it up yet.
+                try {
+                    $dbManager = app(\Stancl\Tenancy\Database\DatabaseManager::class);
+                    $dbManager->createTenantConnection($tenant);
+                    $dbManager->setDefaultConnection('tenant');
+                } catch (\Throwable $_) {
+                    // Non-fatal: let migrations attempt to run and fail with clearer error if misconfigured.
+                }
+
+                $exit = Artisan::call('tenants:migrate', [
                     '--tenants' => [$tenant->getTenantKey()],
                 ]);
+
+                $output = '';
+                try {
+                    $output = Artisan::output();
+                } catch (\Throwable $_) {
+                    // If Artisan is mocked in tests the mock may not provide output();
+                    // swallow and continue with empty output.
+                    $output = '';
+                }
+
+                Log::info('tenants:migrate exit='.$exit.' output='.preg_replace("/[\r\n]+/", ' ', $output));
             }
 
             if ($seed) {
-                Artisan::call('tenants:seed', [
+                $exit = Artisan::call('tenants:seed', [
                     '--tenants' => [$tenant->getTenantKey()],
                 ]);
+
+                $output = '';
+                try {
+                    $output = Artisan::output();
+                } catch (\Throwable $_) {
+                    $output = '';
+                }
+
+                Log::info('tenants:seed exit='.$exit.' output='.preg_replace("/[\r\n]+/", ' ', $output));
             }
         } catch (Throwable $e) {
             Log::error('Tenant provisioning failed during migrate/seed: '.$e->getMessage());
+
+            // Capture any artisan output to help debugging
+            try {
+                $output = Artisan::output();
+                Log::error('tenants:migrate/seed output: '.preg_replace("/[\r\n]+/", ' ', $output));
+            } catch (Throwable $_) {
+                // ignore
+            }
 
             // Attempt cleanup: delete DB and tenant record and mark failed.
             try {
@@ -176,8 +239,39 @@ class TenantProvisionService
             throw $e;
         }
 
+        // If the tenant DB file exists but is zero bytes, remove it so SQLite/PDO can initialize
+        // a valid database file on first connection. This handles managers that simply "touch" files.
+        try {
+            $dbPath = database_path($dbName);
+            if (file_exists($dbPath) && filesize($dbPath) === 0) {
+                Log::warning('Reconciler found zero-byte tenant DB; removing to allow SQLite to initialize', ['path' => $dbPath, 'tenant' => $tenant->getTenantKey()]);
+                @unlink($dbPath);
+            }
+            // Attempt to initialize a valid sqlite DB by opening a PDO connection.
+            try {
+                $pdo = new \PDO('sqlite:'.$dbPath);
+                $pdo->exec('PRAGMA user_version = 1;');
+            } catch (Throwable $_) {
+                // non-fatal
+            }
+        } catch (Throwable $_) {
+            // non-fatal
+        }
+
         try {
             if ($migrate) {
+                // Ensure the tenant connection config is created and the default connection
+                // is switched to 'tenant' before running migrations. This makes the
+                // migrator operate on the tenant DB even in cases where the bootstrap
+                // order may not have set it up yet.
+                try {
+                    $dbManager = app(\Stancl\Tenancy\Database\DatabaseManager::class);
+                    $dbManager->createTenantConnection($tenant);
+                    $dbManager->setDefaultConnection('tenant');
+                } catch (\Throwable $_) {
+                    // Non-fatal: let migrations attempt to run and fail with clearer error if misconfigured.
+                }
+
                 Artisan::call('tenants:migrate', ['--tenants' => [$tenant->getTenantKey()]]);
             }
 
