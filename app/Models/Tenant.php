@@ -28,6 +28,21 @@ class Tenant extends StanclTenant implements TenantWithDatabase
     ];
 
     /**
+     * Ensure Stancl's virtual column system keeps explicit columns on the model table.
+     */
+    public static function getCustomColumns(): array
+    {
+        return array_merge(parent::getCustomColumns(), [
+            'name',
+            'db_name',
+            'provision_state',
+            'created_at',
+            'updated_at',
+            'deleted_at',
+        ]);
+    }
+
+    /**
      * Return a DatabaseConfig instance for this tenant.
      */
     public function database(): DatabaseConfig

@@ -11,9 +11,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Register InitializeLocale middleware for web and api groups
-        // This runs after tenancy and session initialization
+        // Register web middleware that depends on central session state
         $middleware->web(append: [
+            \App\Http\Middleware\InitializeTenancyBySession::class,
             \App\Http\Middleware\InitializeLocale::class,
         ]);
 

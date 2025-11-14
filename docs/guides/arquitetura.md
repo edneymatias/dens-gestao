@@ -1,6 +1,6 @@
 # Arquitetura e checklist — Tenancy multi-db com auth central (ULIDs)
 
-Última atualização: 2025-11-13
+Última atualização: 2025-11-14
 
 Este documento é o checklist autoritativo do trabalho que estamos fazendo — inclui o que já foi realizado, o raciocínio por trás das decisões e os próximos passos. Siga-o passo-a-passo; cada etapa pequena deve ser concluída e marcada como "RESOLVIDO" antes de avançar. A segurança da implementação final é um prioridade: considerar o gerenciamento de sessions, cache, armazenamento em disco como parte do problema do tentant. Você nunca implementa nada, para cada tarefa, você apresenta passos didáticos para que eu execute, inclusive apresentando código para copiar e colar. Estou aprendendo, você é meu coach.
 
@@ -90,42 +90,56 @@ Cada item inclui os arquivos alterados e comandos usados.
     -   Arquivo alterado: `database/migrations/2019_09_15_000020_create_domains_table.php` — `tenant_id` agora é `foreignUlid('tenant_id')->constrained('tenants')->cascadeOnDelete()`.
     -   Racional: garante integridade referencial e tipo consistente com `tenants.id`.
 
+-   [RESOLVIDO] Migrações do Spatie/permission rodando por tenant (13.4)
+
+    -   Arquivos criados/alterados:
+        -   `composer.json`/`composer.lock` — instalado `spatie/laravel-permission` v6.
+        -   `database/migrations/tenant/2025_11_14_000000_create_permission_tables.php` — cópia ajustada da migration do pacote, mantendo `roles`/`permissions` com `bigIncrements`, mas convertendo colunas `model_id` para `ulid()`/`string` conforme necessário e garantindo execução apenas no banco do tenant.
+        -   `app/Models/Tenant.php` — sobrescreve `getCustomColumns()` para que `name`, `db_name`, `provision_state` etc. permaneçam como colunas reais (evitando que o Stancl mova esses campos para `data`).
+    -   Comandos/Testes:
+        -   `php artisan migrate:fresh`
+        -   `php artisan test --filter=TenantPermissionMigrationsTest`
+    -   Racional: provisionar um tenant agora cria automaticamente as tabelas de roles/perms isoladas em cada banco, pré-requisito para Filament Shield.
+
+-   [RESOLVIDO] Middleware `InitializeTenancyBySession` (13.5)
+
+    -   Arquivos criados/alterados:
+        -   `app/Http/Middleware/InitializeTenancyBySession.php` — lê `session('tenant_id')`, inicializa ou encerra tenancy, ajusta `cache.prefix` dinamicamente e limpa o contexto após a resposta.
+        -   `bootstrap/app.php` — registra o middleware no grupo `web` (antes do `InitializeLocale`).
+        -   `tests/Feature/InitializeTenancyBySessionTest.php` — cobre tanto o fluxo feliz quanto sessões com `tenant_id` inválido.
+    -   Comandos/Testes:
+        -   `php artisan test`
+    -   Racional: requests web agora sempre executam no tenant selecionado e o prefixo de cache fica isolado por tenant, evitando vazamentos de sessão/cache.
+
 ## Itens pendentes (PENDENTE) — próximos passos ordenados
 
 Execute um item por vez e reporte quando concluído; eu então liberarei o próximo.
 
-1. (13.4) Rodar migrações do Spatie/permission no contexto do tenant
-
-    - Objetivo: garantir que cada tenant tenha suas próprias tabelas `roles`, `permissions`, etc.
-    - Como: o comando de provisionamento irá executar `tenants:migrate` com os migrations apontando para `database/migrations/tenant` (já configurado em `config/tenancy.php`).
-    - Racional: isolar permissões por tenant evita vazamento de privilégio.
-
-2. (13.5) Middleware de inicialização de tenancy por sessão
-
-    - Objetivo: criar middleware `InitializeTenancyBySession` que verifica `session('tenant_id')` e chama `tenancy()->initialize($tenant)` ou `tenancy()->end()` conforme necessário; ajustar `cache.prefix` dinamicamente.
-    - Racional: garante que requests web operem no contexto do tenant selecionado pelo usuário.
-
-3. (13.6) Tenant selection flow (UI + controller)
+1. (13.6) Tenant selection flow (UI + controller)
 
     - Objetivo: rota/controller para listar tenants aos quais o usuário tem acesso e trocar `session('tenant_id')` com `session()->regenerate()`.
     - Racional: UX para trocar de contexto sem logout.
+    - Observações: garantir que o controller utilize o middleware recém-criado para ativar tenancy após atualizar a sessão e expor feedback claro ao usuário; aproveitar a tabela `tenant_user` como fonte dos tenants disponíveis.
 
-4. (13.7) Jobs / Queues: padronizar tenant context in background jobs
+2. (13.7) Jobs / Queues: padronizar tenant context in background jobs
 
     - Objetivo: garantir que jobs carreguem `tenant_id` no payload, e no `handle()` chamem `tenancy()->initialize($tenant)` antes de operar.
     - Racional: workers não têm sessão — precisamos passar contexto explicitamente.
+    - Observações: reutilizar o prefixo de cache por tenant quando necessário e limpar o contexto no `finally` para evitar vazamentos entre jobs.
 
-5. (13.8) Filament 4 + Filament Shield integration
+3. (13.8) Filament 4 + Filament Shield integration
 
     - Objetivo: garantir Filament resources consultem Spatie tables do tenant quando tenancy estiver inicializada e separar painel landlord/global do painel tenant.
+    - Observações: agora que as tabelas do Spatie existem por tenant, alinhar o Filament Shield para trabalhar em cima dessas tabelas isoladas e assegurar que o painel landlord continue usando o contexto central.
 
-6. (13.9) owen-it/laravel-auditing
+4. (13.9) owen-it/laravel-auditing
 
     - Objetivo: configurar auditing para escrever em DB do tenant (rodar migração do auditing no tenant durante provisionamento).
+    - Observações: seguir o mesmo padrão das migrations do Spatie (copiar para `database/migrations/tenant`) e validar em conjunto com o provisionamento.
 
-7. (13.10) Tests automáticos mínimos
+5. (13.10) Tests automáticos mínimos
 
-    - Escrever testes feature para fluxo: login central → escolher tenant → criar recurso tenant-scoped → confirmar está no DB do tenant; job with tenant_id; spatie permissions are isolated.
+    - Escrever testes feature para fluxo: login central → escolher tenant → criar recurso tenant-scoped → confirmar está no DB do tenant; job with tenant_id; Spatie permissions são isoladas e o middleware de sessão mantém o contexto correto.
 
 ## Racionais e notas técnicas (curtas)
 
